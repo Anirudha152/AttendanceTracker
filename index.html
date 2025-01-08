@@ -735,6 +735,82 @@
                 }
             });
         }
+        document.getElementById('attendanceCourse').addEventListener('change', async (e) => {
+            const courseCode = e.target.value;
+            const entryNumber = document.getElementById('userSelect').value;
+            if (courseCode && entryNumber) {
+                const date = document.getElementById('attendanceDate').value;
+                const day = new Date(date).getDay();
+                const coursesSnapshot = await database.ref('courses').once('value');
+                const courses = coursesSnapshot.val() || {};
+                const courseSchedule = courses[courseCode]?.schedule || [];
+                const relevantSchedule = courseSchedule.find(schedule => schedule.day === day);
+                if (relevantSchedule) {
+                    document.getElementById('startTime').value = relevantSchedule.startTime;
+                    document.getElementById('endTime').value = relevantSchedule.endTime;
+                } else {
+                    document.getElementById('startTime').value = '';
+                    document.getElementById('endTime').value = '';
+                }
+            }
+        });
+        document.getElementById('attendanceDate').addEventListener('input', async (e) => {
+            console.log("HI");
+            const date = e.target.value;
+            const courseCode = document.getElementById('attendanceCourse').value;
+            const day = new Date(date).getDay();
+            if (courseCode) {
+                const coursesSnapshot = await database.ref('courses').once('value');
+                const courses = coursesSnapshot.val() || {};
+                const courseSchedule = courses[courseCode]?.schedule || [];
+                const relevantSchedule = courseSchedule.find(schedule => schedule.day === day);
+                console.log(relevantSchedule);
+                if (relevantSchedule) {
+                    document.getElementById('startTime').value = relevantSchedule.startTime;
+                    document.getElementById('endTime').value = relevantSchedule.endTime;
+                } else {
+                    document.getElementById('startTime').value = '';
+                    document.getElementById('endTime').value = '';
+                }
+            }
+        });
+        document.getElementById('tagCourse').addEventListener('change', async (e) => {
+            const courseCode = e.target.value;
+            const entryNumber = document.getElementById('userSelect').value;
+            if (courseCode && entryNumber) {
+                const date = document.getElementById('tagDate').value;
+                const day = new Date(date).getDay();
+                const coursesSnapshot = await database.ref('courses').once('value');
+                const courses = coursesSnapshot.val() || {};
+                const courseSchedule = courses[courseCode]?.schedule || [];
+                const relevantSchedule = courseSchedule.find(schedule => schedule.day === day);
+                if (relevantSchedule) {
+                    document.getElementById('tagStartTime').value = relevantSchedule.startTime;
+                    document.getElementById('tagEndTime').value = relevantSchedule.endTime;
+                } else {
+                    document.getElementById('tagStartTime').value = '';
+                    document.getElementById('tagEndTime').value = '';
+                }
+            }
+        });
+        document.getElementById('tagDate').addEventListener('input', async (e) => {
+            const date = e.target.value;
+            const courseCode = document.getElementById('tagCourse').value;
+            const day = new Date(date).getDay();
+            if (courseCode) {
+                const coursesSnapshot = await database.ref('courses').once('value');
+                const courses = coursesSnapshot.val() || {};
+                const courseSchedule = courses[courseCode]?.schedule || [];
+                const relevantSchedule = courseSchedule.find(schedule => schedule.day === day);
+                if (relevantSchedule) {
+                    document.getElementById('tagStartTime').value = relevantSchedule.startTime;
+                    document.getElementById('tagEndTime').value = relevantSchedule.endTime;
+                } else {
+                    document.getElementById('tagStartTime').value = '';
+                    document.getElementById('tagEndTime').value = '';
+                }
+            }
+        });
 
         document.getElementById('markAttendance').addEventListener('click', async () => {
             const entryNumber = document.getElementById('userSelect').value;
@@ -951,8 +1027,11 @@
             const timeInput = document.getElementById(id);
             roundToNearestThirtyMinutes(timeInput);
         });
+
+
         // Initialize the application
         loadUsers();
+
     </script>
 </body>
 </html>
