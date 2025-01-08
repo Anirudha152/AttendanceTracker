@@ -751,6 +751,7 @@
         });
 
         document.getElementById('viewAttendance').addEventListener('click', async (e) => {
+            document.getElementById('attendanceResults').innerHTML = "";
             const entryNumber = document.getElementById('userSelect').value;
             const courseCode = document.getElementById('viewCourse').value;
             if (entryNumber && courseCode) {
