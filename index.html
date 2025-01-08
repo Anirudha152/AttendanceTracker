@@ -380,6 +380,14 @@
                     document.getElementById('tagCourse').value = relevantCourse.code;
                     document.getElementById('tagStartTime').value = relevantCourse.startTime;
                     document.getElementById('tagEndTime').value = relevantCourse.endTime;
+                } else {
+                    document.getElementById('attendanceCourse').value = '';
+                    document.getElementById('startTime').value = '';
+                    document.getElementById('endTime').value = '';
+
+                    document.getElementById('tagCourse').value = '';
+                    document.getElementById('tagStartTime').value = '';
+                    document.getElementById('tagEndTime').value = '';
                 }
 
                 const today = new Date().toISOString().split('T')[0];
@@ -431,6 +439,10 @@
             const timeSlot = `${startTime}-${endTime}`;
 
             try {
+                if (!entryNumber) {
+                    alert('Please select a user');
+                    return;
+                }
                 // Check if attendance is allowed
                 const allowed = await isAttendanceAllowed(date, courseCode, timeSlot);
                 if (!allowed) {
