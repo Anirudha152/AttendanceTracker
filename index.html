@@ -157,6 +157,32 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+        async function isAttendanceAllowed(date, courseCode, timeSlot) {
+            try {
+                const classRef = database.ref(`classes/${date}/${courseCode}/${timeSlot}`);
+                const snapshot = await classRef.once('value');
+                const classData = snapshot.val();
+
+                if (!classData) return true; // If no class data exists, allow attendance
+
+                // Don't allow attendance if class is cancelled or marked as attendance not taken
+                return !(classData.tag === 'cancelled' || classData.tag === 'attendance_not_taken');
+            } catch (error) {
+                console.error('Error checking attendance permission:', error);
+                return false;
+            }
+        }
+
+        async function removeExistingAttendance(date, courseCode, timeSlot) {
+            try {
+                const attendancePath = `attendance/${date}/${courseCode}/${timeSlot}`;
+                await database.ref(attendancePath).remove();
+                console.log('Existing attendance removed');
+            } catch (error) {
+                console.error('Error removing existing attendance:', error);
+            }
+        }
+
         function getCurrentTime() {
             const now = new Date();
             const istOptions = { timeZone: 'Asia/Kolkata', hour12: false };
@@ -288,8 +314,8 @@
             const ca = document.cookie.split(';');
             for(let i = 0; i < ca.length; i++) {
                 let c = ca[i];
-                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
             }
             return null;
         }
@@ -405,6 +431,13 @@
             const timeSlot = `${startTime}-${endTime}`;
 
             try {
+                // Check if attendance is allowed
+                const allowed = await isAttendanceAllowed(date, courseCode, timeSlot);
+                if (!allowed) {
+                    alert('Cannot mark attendance for this class as it is either cancelled or marked as attendance not taken');
+                    return;
+                }
+
                 const attendancePath = `attendance/${date}/${courseCode}/${timeSlot}/${entryNumber}`;
                 const classPath = `classes/${date}/${courseCode}/${timeSlot}`;
 
@@ -442,7 +475,6 @@
 
         document.getElementById('tagForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const entryNumber = document.getElementById('userSelect').value;
             const courseCode = document.getElementById('tagCourse').value;
             const date = document.getElementById('tagDate').value;
             const startTime = document.getElementById('tagStartTime').value;
@@ -454,7 +486,6 @@
             try {
                 const classPath = `classes/${date}/${courseCode}/${timeSlot}`;
                 const classData = {
-                    entry_number: entryNumber,
                     course_code: courseCode,
                     date: date,
                     startTime: startTime,
@@ -468,6 +499,12 @@
                 }
 
                 await database.ref(classPath).set(classData);
+
+                // If class is tagged as cancelled or attendance_not_taken, remove existing attendance
+                if (tag === 'cancelled' || tag === 'attendance_not_taken') {
+                    await removeExistingAttendance(date, courseCode, timeSlot);
+                }
+
                 alert('Class tagged successfully');
                 updateLastUpdatedTime();
             } catch (error) {
@@ -555,17 +592,20 @@
                 ).length;
 
                 function getRowStyle(classStatus, attendance) {
-                    if (classStatus === 'cancelled') {
-                        return 'background-color: #ffebcc !important;'; // Light orange for cancelled classes
-                    }
-                    if (attendance === 'Not Marked') {
-                        return 'background-color: #ffe6e6 !important;'; // Light red for unmarked attendance
-                    }
-                    if (classStatus === 'extra' || classStatus === 'online') {
-                        return 'background-color: #e6f3ff !important;'; // Very light blue for extra/online classes
-                    }
-                    return ''; // Default color for normal classes with marked attendance
-                }
+            if (classStatus === 'cancelled') {
+                return 'background-color: #ffebcc !important;'; // Light orange for cancelled classes
+            }
+            if (classStatus === 'attendance_not_taken') {
+                return 'background-color: #e0e0e0 !important;'; // Light gray for attendance not taken
+            }
+            if (attendance === 'Not Marked') {
+                return 'background-color: #ffe6e6 !important;'; // Light red for unmarked attendance
+            }
+            if (classStatus === 'extra' || classStatus === 'online') {
+                return 'background-color: #e6f3ff !important;'; // Very light blue for extra/online classes
+            }
+            return ''; // Default color for normal classes with marked attendance
+        }
 
                 // Generate HTML for results
                 let resultsHTML = `
@@ -683,6 +723,215 @@
                 }
             });
         }
+
+        document.getElementById('markAttendance').addEventListener('click', async () => {
+            const entryNumber = document.getElementById('userSelect').value;
+            if (entryNumber) {
+                await loadUserData(entryNumber);
+            }
+        });
+
+        document.getElementById('tagClass').addEventListener('click', async () => {
+            const entryNumber = document.getElementById('userSelect').value;
+            if (entryNumber) {
+                await loadUserData(entryNumber);
+            }
+        });
+
+        document.getElementById('viewAttendance').addEventListener('click', async (e) => {
+            const entryNumber = document.getElementById('userSelect').value;
+            const courseCode = document.getElementById('viewCourse').value;
+            if (entryNumber && courseCode) {
+                try {
+                    // Get attendance records
+                    const attendanceSnapshot = await database.ref('attendance').once('value');
+                    const attendance = attendanceSnapshot.val() || {};
+
+                    // Get class records
+                    const classesSnapshot = await database.ref('classes').once('value');
+                    const classes = classesSnapshot.val() || {};
+
+                    // Get course schedule
+                    const coursesSnapshot = await database.ref('courses').once('value');
+                    const courses = coursesSnapshot.val() || {};
+                    const courseSchedule = courses[courseCode]?.schedule || [];
+
+                    // Process attendance records
+                    const attendedClasses = [];
+                    Object.keys(attendance).forEach(date => {
+                        if (attendance[date]?.[courseCode]) {
+                            Object.entries(attendance[date][courseCode]).forEach(([timeSlot, attendanceData]) => {
+                                if (attendanceData[entryNumber]) {
+                                    const record = attendanceData[entryNumber];
+                                    attendedClasses.push({
+                                        date,
+                                        timeSlot,
+                                        startTime: record.startTime,
+                                        endTime: record.endTime,
+                                        attendance_type: record.attendance_type
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    // Process class records
+                    const classRecords = [];
+                    Object.keys(classes).forEach(date => {
+                        if (classes[date]?.[courseCode]) {
+                            Object.entries(classes[date][courseCode]).forEach(([timeSlot, record]) => {
+                                classRecords.push({
+                                    date,
+                                    timeSlot,
+                                    startTime: record.startTime,
+                                    endTime: record.endTime,
+                                    tag: record.tag,
+                                    remark: record.remark || ''
+                                });
+                            });
+                        }
+                    });
+
+                    attendedClasses.sort((a, b) => {
+                        const dateCompare = b.date.localeCompare(a.date);
+                        return dateCompare !== 0 ? dateCompare : b.startTime.localeCompare(a.startTime);
+                    });
+
+                    classRecords.sort((a, b) => {
+                        const dateCompare = b.date.localeCompare(a.date);
+                        return dateCompare !== 0 ? dateCompare : b.startTime.localeCompare(a.startTime);
+                    });
+
+                    // Calculate statistics
+                    const totalClasses = classRecords.filter(record =>
+                        record.tag === 'normal' || record.tag === 'online' || record.tag === 'extra'
+                    ).length;
+
+                    const validAttendance = attendedClasses.filter(record =>
+                        record.attendance_type === 'true'
+                    ).length;
+
+                    const proxyAttendance = attendedClasses.filter(record =>
+                        record.attendance_type === 'proxy'
+                    ).length;
+
+                    function getRowStyle(classStatus, attendance) {
+                        if (classStatus === 'cancelled') {
+                            return 'background-color: #ffebcc !important;'; // Light orange for cancelled classes
+                        }
+                        if (attendance === 'Not Marked') {
+                            return 'background-color: #ffe6e6 !important;'; // Light red for unmarked attendance
+                        }
+                        if (classStatus === 'extra' || classStatus === 'online') {
+                            return 'background-color: #e6f3ff !important;'; // Very light blue for extra/online classes
+                        }
+                        return ''; // Default color for normal classes with marked attendance
+                    }
+
+                    // Generate HTML for results
+                    let resultsHTML = `
+                        <div class="alert alert-info">
+                            <h6>Attendance Summary</h6>
+                            <p>Total Classes: ${totalClasses}<br>
+                            Valid Attendance: ${validAttendance}<br>
+                            Proxy Attendance: ${proxyAttendance}<br>
+                            Attendance Percentage: ${totalClasses > 0 ? ((validAttendance / totalClasses) * 100).toFixed(2) : 0}%</p>
+                        </div>
+                        <div class="table-responsive">
+                            <div class="mb-3">
+                                <small class="d-block mb-1">
+                                    <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #ffe6e6;"></span>
+                                    Unmarked Attendance
+                                </small>
+                                <small class="d-block mb-1">
+                                    <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #e6f3ff;"></span>
+                                    Extra/Online Class
+                                </small>
+                                <small class="d-block">
+                                    <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #ffebcc;"></span>
+                                    Cancelled Class
+                                </small>
+                            </div>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Class Status</th>
+                                        <th>Attendance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+
+                    // Create a map of all unique date-time slots
+                    const allSlots = new Map();
+
+                    // Add class records to the map
+                    classRecords.forEach(record => {
+                        const key = `${record.date}-${record.timeSlot}`;
+                        allSlots.set(key, {
+                            date: record.date,
+                            timeSlot: record.timeSlot,
+                            startTime: record.startTime,
+                            endTime: record.endTime,
+                            classStatus: record.tag === 'other' ? `${record.tag} (${record.remark})` : record.tag,
+                            attendance: 'Not Marked'
+                        });
+                    });
+
+                    // Update attendance information in the map
+                    attendedClasses.forEach(record => {
+                        const key = `${record.date}-${record.timeSlot}`;
+                        if (!allSlots.has(key)) {
+                            // If there's attendance but no class record, add it
+                            allSlots.set(key, {
+                                date: record.date,
+                                timeSlot: record.timeSlot,
+                                startTime: record.startTime,
+                                endTime: record.endTime,
+                                classStatus: 'normal',
+                                attendance: 'Not Marked'
+                            });
+                        }
+                        const slot = allSlots.get(key);
+                        slot.attendance = record.attendance_type === 'true' ? 'Present' : 'Proxy';
+                    });
+
+                    // Convert map to array and sort by date and time
+                    const allSlotsArray = Array.from(allSlots.values())
+                        .sort((a, b) => {
+                            const dateCompare = b.date.localeCompare(a.date);
+                            return dateCompare !== 0 ? dateCompare : b.startTime.localeCompare(a.startTime);
+                        });
+
+                    // Generate table rows with highlighting
+                    allSlotsArray.forEach(slot => {
+                        const rowStyle = getRowStyle(slot.classStatus, slot.attendance);
+                        resultsHTML += `
+                            <tr>
+                                <td style="${rowStyle}">${new Date(slot.date).toLocaleDateString()}</td>
+                                <td style="${rowStyle}">${slot.startTime} - ${slot.endTime}</td>
+                                <td style="${rowStyle}">${slot.classStatus}</td>
+                                <td style="${rowStyle}">${slot.attendance}</td>
+                            </tr>`;
+                    });
+
+                    resultsHTML += `
+                                </tbody>
+                            </table>
+                        </div>`;
+
+                    document.getElementById('attendanceResults').innerHTML = resultsHTML;
+                    updateLastUpdatedTime();
+                } catch (error) {
+                    alert('Error viewing attendance: ' + error.message);
+                    document.getElementById('attendanceResults').innerHTML = `
+                        <div class="alert alert-danger">
+                            Error loading attendance data: ${error.message}
+                        </div>`;
+                }
+            }
+        });
 
         // Apply to all time inputs
         ['startTime', 'endTime', 'tagStartTime', 'tagEndTime'].forEach(id => {
