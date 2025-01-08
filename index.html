@@ -1,1 +1,696 @@
-<h1>HELLO WORLD</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Management Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-database-compat.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Attendance Portal</a>
+            <div class="navbar-text text-light d-none" id="lastUpdatedInfo">
+                Last Updated: <span id="lastUpdatedTime"></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Select User</h5>
+            </div>
+            <div class="card-body">
+                <select id="userSelect" class="form-select mb-3">
+                    <option value="">Select Entry Number</option>
+                </select>
+                <div id="userInfo" class="alert alert-info d-none">
+                    Name: <span id="userName"></span><br>
+                    Courses: <span id="userCourses"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="btn-group w-100 mb-3" role="group">
+                    <input type="radio" class="btn-check" name="action" id="markAttendance" value="markAttendance" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary" for="markAttendance">Mark Attendance</label>
+                    <input type="radio" class="btn-check" name="action" id="tagClass" value="tagClass" autocomplete="off">
+                    <label class="btn btn-outline-primary" for="tagClass">Tag Class</label>
+                    <input type="radio" class="btn-check" name="action" id="viewAttendance" value="viewAttendance" autocomplete="off">
+                    <label class="btn btn-outline-primary" for="viewAttendance">View Attendance</label>
+                </div>
+            </div>
+        </div>
+
+        <div id="markAttendanceForm" class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Mark Attendance</h5>
+            </div>
+            <div class="card-body">
+                <form id="attendanceForm">
+                    <div class="mb-3">
+                        <label class="form-label">Course</label>
+                        <select id="attendanceCourse" class="form-select" required>
+                            <option value="">Select Course</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="attendanceDate" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Time Slot</label>
+                        <div class="input-group">
+                            <input type="time" id="startTime" class="form-control" step="1800" required>
+                            <span class="input-group-text">to</span>
+                            <input type="time" id="endTime" class="form-control" step="1800" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Attendance Type</label>
+                        <select id="attendanceType" class="form-select" required>
+                            <option value="true">True</option>
+                            <option value="proxy">Proxy</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Mark Attendance</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="tagClassForm" class="card mb-4 d-none">
+            <div class="card-header">
+                <h5 class="mb-0">Tag Class</h5>
+            </div>
+            <div class="card-body">
+                <form id="tagForm">
+                    <div class="mb-3">
+                        <label class="form-label">Course</label>
+                        <select id="tagCourse" class="form-select" required>
+                            <option value="">Select Course</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="tagDate" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Time Slot</label>
+                        <div class="input-group">
+                            <input type="time" id="tagStartTime" class="form-control" step="1800" required>
+                            <span class="input-group-text">to</span>
+                            <input type="time" id="tagEndTime" class="form-control" step="1800" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tag</label>
+                        <select id="tagType" class="form-select" required>
+                            <option value="normal">Normal</option>
+                            <option value="extra">Extra Class</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="attendance_not_taken">Attendance Not Taken</option>
+                            <option value="online">Online</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div id="remarkDiv" class="mb-3 d-none">
+                        <label class="form-label">Remark</label>
+                        <input type="text" id="remark" class="form-control">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Tag Class</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="viewAttendanceForm" class="card mb-4 d-none">
+            <div class="card-header">
+                <h5 class="mb-0">View Attendance</h5>
+            </div>
+            <div class="card-body">
+                <form id="viewForm">
+                    <div class="mb-3">
+                        <label class="form-label">Course</label>
+                        <select id="viewCourse" class="form-select" required>
+                            <option value="">Select Course</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">View Attendance</button>
+                </form>
+                <div id="attendanceResults" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            databaseURL: 'https://ai-club-343bb.firebaseio.com/'
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        function getCurrentTime() {
+            const now = new Date();
+            const istOptions = { timeZone: 'Asia/Kolkata', hour12: false };
+            const [hours, minutes] = new Intl.DateTimeFormat('en-US', {
+                ...istOptions,
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(now).split(':');
+            return `${hours}:${minutes}`;
+        }
+
+        function getCurrentDay() {
+            const istDate = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Kolkata',
+                weekday: 'long'
+            }).format(new Date());
+
+            const days = {
+                'Sunday': 0,
+                'Monday': 1,
+                'Tuesday': 2,
+                'Wednesday': 3,
+                'Thursday': 4,
+                'Friday': 5,
+                'Saturday': 6
+            };
+
+            return days[istDate];
+        }
+
+        async function findRelevantCourse(entryNumber) {
+            if (!entryNumber) return null;
+
+            const currentTime = getCurrentTime();
+            const currentDay = getCurrentDay();
+            const currentDate = new Date().toISOString().split('T')[0];
+
+            try {
+                const [coursesSnapshot, userSnapshot, classesSnapshot] = await Promise.all([
+                    database.ref('courses').once('value'),
+                    database.ref(`users/${entryNumber}`).once('value'),
+                    database.ref(`classes/${currentDate}`).once('value')
+                ]);
+
+                const courses = coursesSnapshot.val();
+                const userData = userSnapshot.val();
+                const todayClasses = classesSnapshot.val();
+
+                if (!userData || !userData.registered_courses) return null;
+
+                let relevantClasses = [];
+
+                // Check scheduled courses
+                if (courses) {
+                    relevantClasses = Object.entries(courses)
+                        .filter(([code]) => userData.registered_courses.includes(code))
+                        .flatMap(([code, course]) => {
+                            const todaySchedules = course.schedule.filter(s => s.day === currentDay);
+                            return todaySchedules.map(schedule => ({
+                                code,
+                                name: course.name,
+                                startTime: schedule.startTime,
+                                endTime: schedule.endTime,
+                                room: schedule.room || course.room,
+                                type: 'scheduled'
+                            }));
+                        });
+                }
+
+                // Check tagged classes
+                if (todayClasses) {
+                    Object.entries(todayClasses).forEach(([code, slots]) => {
+                        if (userData.registered_courses.includes(code)) {
+                            Object.entries(slots).forEach(([timeSlot, classInfo]) => {
+                                if (classInfo.tag !== 'cancelled') {
+                                    const [startTime, endTime] = timeSlot.split('-');
+                                    relevantClasses.push({
+                                        code,
+                                        startTime,
+                                        endTime,
+                                        type: 'tagged',
+                                        tag: classInfo.tag
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+
+                // Sort by start time
+                relevantClasses.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+                // Find current or next class
+                const currentClass = relevantClasses.find(course =>
+                    currentTime >= course.startTime && currentTime <= course.endTime
+                );
+
+                if (currentClass) {
+                    return {
+                        code: currentClass.code,
+                        startTime: currentClass.startTime,
+                        endTime: currentClass.endTime
+                    };
+                }
+
+                const nextClass = relevantClasses.find(course =>
+                    currentTime < course.startTime
+                );
+
+                return nextClass ? {
+                    code: nextClass.code,
+                    startTime: nextClass.startTime,
+                    endTime: nextClass.endTime
+                } : null;
+            } catch (error) {
+                console.error('Error finding relevant course:', error);
+                return null;
+            }
+        }
+
+        function setCookie(name, value, days) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function updateLastUpdatedTime() {
+            const now = new Date();
+            document.getElementById('lastUpdatedTime').textContent = now.toLocaleString();
+            document.getElementById('lastUpdatedInfo').classList.remove('d-none');
+        }
+
+        async function loadUsers() {
+            const usersRef = database.ref('users');
+            usersRef.on('value', (snapshot) => {
+                const users = snapshot.val();
+                const userSelect = document.getElementById('userSelect');
+                userSelect.innerHTML = '<option value="">Select Entry Number</option>';
+
+                for (const entryNumber in users) {
+                    const option = document.createElement('option');
+                    option.value = entryNumber;
+                    option.textContent = `${entryNumber} - ${users[entryNumber].name}`;
+                    userSelect.appendChild(option);
+                }
+
+                const lastUser = getCookie('lastUser');
+                if (lastUser && users[lastUser]) {
+                    userSelect.value = lastUser;
+                    loadUserData(lastUser);
+                }
+            });
+        }
+
+        async function loadUserData(entryNumber) {
+            if (!entryNumber) return;
+
+            try {
+                const userData = (await database.ref(`users/${entryNumber}`).once('value')).val();
+                document.getElementById('userName').textContent = userData.name;
+                document.getElementById('userCourses').textContent = userData.registered_courses.join(', ');
+                document.getElementById('userInfo').classList.remove('d-none');
+
+                const courseSelects = ['attendanceCourse', 'tagCourse', 'viewCourse'];
+                const relevantCourse = await findRelevantCourse(entryNumber);
+
+                courseSelects.forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = '<option value="">Select Course</option>';
+
+                    userData.registered_courses.forEach(course => {
+                        const option = document.createElement('option');
+                        option.value = course;
+                        option.textContent = course;
+                        select.appendChild(option);
+                    });
+                });
+
+                if (relevantCourse) {
+                    document.getElementById('attendanceCourse').value = relevantCourse.code;
+                    document.getElementById('startTime').value = relevantCourse.startTime;
+                    document.getElementById('endTime').value = relevantCourse.endTime;
+
+                    document.getElementById('tagCourse').value = relevantCourse.code;
+                    document.getElementById('tagStartTime').value = relevantCourse.startTime;
+                    document.getElementById('tagEndTime').value = relevantCourse.endTime;
+                }
+
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('attendanceDate').value = today;
+                document.getElementById('tagDate').value = today;
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+        }
+
+        document.getElementById('userSelect').addEventListener('change', (e) => {
+            const entryNumber = e.target.value;
+            if (entryNumber) {
+                setCookie('lastUser', entryNumber, 30);
+                loadUserData(entryNumber);
+            } else {
+                document.getElementById('userInfo').classList.add('d-none');
+            }
+        });
+
+        document.querySelectorAll('input[name="action"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                document.getElementById('markAttendanceForm').classList.add('d-none');
+                document.getElementById('tagClassForm').classList.add('d-none');
+                document.getElementById('viewAttendanceForm').classList.add('d-none');
+                document.getElementById(`${e.target.value}Form`).classList.remove('d-none');
+            });
+        });
+
+        document.getElementById('tagType').addEventListener('change', (e) => {
+            const remarkDiv = document.getElementById('remarkDiv');
+            if (e.target.value === 'other') {
+                remarkDiv.classList.remove('d-none');
+                document.getElementById('remark').required = true;
+            } else {
+                remarkDiv.classList.add('d-none');
+                document.getElementById('remark').required = false;
+            }
+        });
+
+        document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const entryNumber = document.getElementById('userSelect').value;
+            const courseCode = document.getElementById('attendanceCourse').value;
+            const date = document.getElementById('attendanceDate').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const attendanceType = document.getElementById('attendanceType').value;
+            const timeSlot = `${startTime}-${endTime}`;
+
+            try {
+                const attendancePath = `attendance/${date}/${courseCode}/${timeSlot}/${entryNumber}`;
+                const classPath = `classes/${date}/${courseCode}/${timeSlot}`;
+
+                const updates = {};
+                updates[attendancePath] = {
+                    entry_number: entryNumber,
+                    course_code: courseCode,
+                    date: date,
+                    startTime: startTime,
+                    endTime: endTime,
+                    attendance_type: attendanceType,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                };
+
+                await database.ref(classPath).transaction((currentData) => {
+                    if (currentData === null) {
+                        return {
+                            tag: 'normal',
+                            startTime: startTime,
+                            endTime: endTime,
+                            timestamp: firebase.database.ServerValue.TIMESTAMP
+                        };
+                    }
+                    return currentData;
+                });
+
+                await database.ref().update(updates);
+                alert('Attendance marked successfully');
+                updateLastUpdatedTime();
+            } catch (error) {
+                alert('Error marking attendance: ' + error.message);
+            }
+        });
+
+
+        document.getElementById('tagForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const entryNumber = document.getElementById('userSelect').value;
+            const courseCode = document.getElementById('tagCourse').value;
+            const date = document.getElementById('tagDate').value;
+            const startTime = document.getElementById('tagStartTime').value;
+            const endTime = document.getElementById('tagEndTime').value;
+            const timeSlot = `${startTime}-${endTime}`;
+            const tag = document.getElementById('tagType').value;
+            const remark = document.getElementById('remark').value;
+
+            try {
+                const classPath = `classes/${date}/${courseCode}/${timeSlot}`;
+                const classData = {
+                    entry_number: entryNumber,
+                    course_code: courseCode,
+                    date: date,
+                    startTime: startTime,
+                    endTime: endTime,
+                    tag: tag,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                };
+
+                if (tag === 'other') {
+                    classData.remark = remark;
+                }
+
+                await database.ref(classPath).set(classData);
+                alert('Class tagged successfully');
+                updateLastUpdatedTime();
+            } catch (error) {
+                alert('Error tagging class: ' + error.message);
+            }
+        });
+
+        // Handle attendance viewing
+        document.getElementById('viewForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const entryNumber = document.getElementById('userSelect').value;
+            const courseCode = document.getElementById('viewCourse').value;
+
+            try {
+                // Get attendance records
+                const attendanceSnapshot = await database.ref('attendance').once('value');
+                const attendance = attendanceSnapshot.val() || {};
+
+                // Get class records
+                const classesSnapshot = await database.ref('classes').once('value');
+                const classes = classesSnapshot.val() || {};
+
+                // Get course schedule
+                const coursesSnapshot = await database.ref('courses').once('value');
+                const courses = coursesSnapshot.val() || {};
+                const courseSchedule = courses[courseCode]?.schedule || [];
+
+                // Process attendance records
+                const attendedClasses = [];
+                Object.keys(attendance).forEach(date => {
+                    if (attendance[date]?.[courseCode]) {
+                        Object.entries(attendance[date][courseCode]).forEach(([timeSlot, attendanceData]) => {
+                            if (attendanceData[entryNumber]) {
+                                const record = attendanceData[entryNumber];
+                                attendedClasses.push({
+                                    date,
+                                    timeSlot,
+                                    startTime: record.startTime,
+                                    endTime: record.endTime,
+                                    attendance_type: record.attendance_type
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // Process class records
+                const classRecords = [];
+                Object.keys(classes).forEach(date => {
+                    if (classes[date]?.[courseCode]) {
+                        Object.entries(classes[date][courseCode]).forEach(([timeSlot, record]) => {
+                            classRecords.push({
+                                date,
+                                timeSlot,
+                                startTime: record.startTime,
+                                endTime: record.endTime,
+                                tag: record.tag,
+                                remark: record.remark || ''
+                            });
+                        });
+                    }
+                });
+
+                attendedClasses.sort((a, b) => {
+                    const dateCompare = b.date.localeCompare(a.date);
+                    return dateCompare !== 0 ? dateCompare : b.startTime.localeCompare(a.startTime);
+                });
+
+                classRecords.sort((a, b) => {
+                    const dateCompare = b.date.localeCompare(a.date);
+                    return dateCompare !== 0 ? dateCompare : b.startTime.localeCompare(a.startTime);
+                });
+
+                // Calculate statistics
+                const totalClasses = classRecords.filter(record =>
+                    record.tag === 'normal' || record.tag === 'online' || record.tag === 'extra'
+                ).length;
+
+                const validAttendance = attendedClasses.filter(record =>
+                    record.attendance_type === 'true'
+                ).length;
+
+                const proxyAttendance = attendedClasses.filter(record =>
+                    record.attendance_type === 'proxy'
+                ).length;
+
+                function getRowStyle(classStatus, attendance) {
+                    if (classStatus === 'cancelled') {
+                        return 'background-color: #ffebcc !important;'; // Light orange for cancelled classes
+                    }
+                    if (attendance === 'Not Marked') {
+                        return 'background-color: #ffe6e6 !important;'; // Light red for unmarked attendance
+                    }
+                    if (classStatus === 'extra' || classStatus === 'online') {
+                        return 'background-color: #e6f3ff !important;'; // Very light blue for extra/online classes
+                    }
+                    return ''; // Default color for normal classes with marked attendance
+                }
+
+                // Generate HTML for results
+                let resultsHTML = `
+                    <div class="alert alert-info">
+                        <h6>Attendance Summary</h6>
+                        <p>Total Classes: ${totalClasses}<br>
+                        Valid Attendance: ${validAttendance}<br>
+                        Proxy Attendance: ${proxyAttendance}<br>
+                        Attendance Percentage: ${totalClasses > 0 ? ((validAttendance / totalClasses) * 100).toFixed(2) : 0}%</p>
+                    </div>
+                    <div class="table-responsive">
+                        <div class="mb-3">
+                            <small class="d-block mb-1">
+                                <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #ffe6e6;"></span>
+                                Unmarked Attendance
+                            </small>
+                            <small class="d-block mb-1">
+                                <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #e6f3ff;"></span>
+                                Extra/Online Class
+                            </small>
+                            <small class="d-block">
+                                <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #ffebcc;"></span>
+                                Cancelled Class
+                            </small>
+                        </div>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Class Status</th>
+                                    <th>Attendance</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                // Create a map of all unique date-time slots
+                const allSlots = new Map();
+
+                // Add class records to the map
+                classRecords.forEach(record => {
+                    const key = `${record.date}-${record.timeSlot}`;
+                    allSlots.set(key, {
+                        date: record.date,
+                        timeSlot: record.timeSlot,
+                        startTime: record.startTime,
+                        endTime: record.endTime,
+                        classStatus: record.tag === 'other' ? `${record.tag} (${record.remark})` : record.tag,
+                        attendance: 'Not Marked'
+                    });
+                });
+
+                // Update attendance information in the map
+                attendedClasses.forEach(record => {
+                    const key = `${record.date}-${record.timeSlot}`;
+                    if (!allSlots.has(key)) {
+                        // If there's attendance but no class record, add it
+                        allSlots.set(key, {
+                            date: record.date,
+                            timeSlot: record.timeSlot,
+                            startTime: record.startTime,
+                            endTime: record.endTime,
+                            classStatus: 'normal',
+                            attendance: 'Not Marked'
+                        });
+                    }
+                    const slot = allSlots.get(key);
+                    slot.attendance = record.attendance_type === 'true' ? 'Present' : 'Proxy';
+                });
+
+                // Convert map to array and sort by date and time
+                const allSlotsArray = Array.from(allSlots.values())
+                    .sort((a, b) => {
+                        const dateCompare = b.date.localeCompare(a.date);
+                        return dateCompare !== 0 ? dateCompare : b.startTime.localeCompare(a.startTime);
+                    });
+
+                // Generate table rows with highlighting
+                allSlotsArray.forEach(slot => {
+                    const rowStyle = getRowStyle(slot.classStatus, slot.attendance);
+                    resultsHTML += `
+                        <tr>
+                            <td style="${rowStyle}">${new Date(slot.date).toLocaleDateString()}</td>
+                            <td style="${rowStyle}">${slot.startTime} - ${slot.endTime}</td>
+                            <td style="${rowStyle}">${slot.classStatus}</td>
+                            <td style="${rowStyle}">${slot.attendance}</td>
+                        </tr>`;
+                });
+
+                resultsHTML += `
+                            </tbody>
+                        </table>
+                    </div>`;
+
+                document.getElementById('attendanceResults').innerHTML = resultsHTML;
+                updateLastUpdatedTime();
+            } catch (error) {
+                alert('Error viewing attendance: ' + error.message);
+                document.getElementById('attendanceResults').innerHTML = `
+                    <div class="alert alert-danger">
+                        Error loading attendance data: ${error.message}
+                    </div>`;
+            }
+        });
+        function roundToNearestThirtyMinutes(timeInput) {
+            timeInput.addEventListener('change', (e) => {
+                const time = e.target.value;
+                if (time) {
+                    const [hours, minutes] = time.split(':');
+                    const roundedMinutes = Math.round(minutes / 30) * 30;
+                    const adjustedHours = parseInt(hours) + Math.floor(roundedMinutes / 60);
+                    const finalMinutes = roundedMinutes % 60;
+
+                    e.target.value = `${String(adjustedHours).padStart(2, '0')}:${String(finalMinutes).padStart(2, '0')}`;
+                }
+            });
+        }
+
+        // Apply to all time inputs
+        ['startTime', 'endTime', 'tagStartTime', 'tagEndTime'].forEach(id => {
+            const timeInput = document.getElementById(id);
+            roundToNearestThirtyMinutes(timeInput);
+        });
+        // Initialize the application
+        loadUsers();
+    </script>
+</body>
+</html>
