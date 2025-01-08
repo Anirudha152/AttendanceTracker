@@ -7,6 +7,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -141,8 +142,19 @@
                             <option value="">Select Course</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">View Attendance</button>
                 </form>
+                <!-- Add canvas for pie chart -->
+                <div class="container d-none" id="pie_container">
+                    <div class="row justify-content-center">
+                        <div class="col-md-3 mb-2">
+                            <div class="card" style="border-width: 0 !important;">
+                                <div class="card-body" >
+                                    <canvas id="attendanceChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div id="attendanceResults" class="mt-4"></div>
             </div>
         </div>
@@ -524,7 +536,7 @@
         });
 
         // Handle attendance viewing
-        document.getElementById('viewForm').addEventListener('submit', async (e) => {
+        document.getElementById('viewCourse').addEventListener('change', async (e) => {
             e.preventDefault();
             const entryNumber = document.getElementById('userSelect').value;
             const courseCode = document.getElementById('viewCourse').value;
@@ -636,6 +648,7 @@
             }
         });
 
+        let currentChart = null;
         async function fetchAndDisplayAttendance(entryNumber, courseCode) {
             try {
                 // Get attendance records
@@ -734,28 +747,69 @@
                     record.tag === 'attendance_not_taken'
                 ).length;
 
+                const missedClasses = totalClasses - (validAttendance + proxyAttendance + attendanceNotTaken);
+                const attendancePercentage = totalClasses > 0 ?
+                    (((validAttendance + proxyAttendance + attendanceNotTaken) / totalClasses) * 100).toFixed(2) : 0;
+                // Create or update pie chart
+                const ctx = document.getElementById('attendanceChart').getContext('2d');
+
+                // Destroy existing chart if it exists
+                if (currentChart instanceof Chart) {
+                    currentChart.destroy();
+                }
+                const options = {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        textInside: {
+                            text: `${attendancePercentage}%`,
+                            color: 'black',
+                            fontSize: 24
+                        }
+                    },
+                    layout: {
+                        padding: 5
+                    },
+                    cutout: '80%',
+                };
+                document.getElementById('pie_container').classList.remove('d-none');
+                currentChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Present', 'NoAtt', 'Missed'],
+                        datasets: [{
+                            data: [validAttendance + proxyAttendance, attendanceNotTaken, missedClasses],
+                            backgroundColor: [
+                                '#198754', // Present - Green
+                                '#6c757d', // NoAtt - Gray
+                                '#dc3545'  // Missed - Red
+                            ],
+                            borderWidth: 2,
+                            borderRadius: 100,
+                        }]
+                    },
+                    options: options
+                });
+                Chart.register({
+                    id: 'textInside',
+                    afterDatasetsDraw: function (chart, args, pluginOptions) {
+                        const {ctx, data} = chart;
+                        const text = pluginOptions.text;
+                        ctx.save();
+                        const x = chart.getDatasetMeta(0).data[0].x;
+                        const y = chart.getDatasetMeta(0).data[0].y;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.font = `bold 130% sans-serif`;
+                        ctx.fillText(text, x, y);
+                    }
+                });
+
+
                 let resultsHTML = `
-            <div class="alert alert-info">
-                <h6>Attendance Summary</h6>
-                <p>Total Classes: ${totalClasses}<br>
-                Attendance Marked: ${validAttendance + proxyAttendance}<br>
-                NoAtt Classes: ${attendanceNotTaken}<br>
-                Attendance Percentage: ${totalClasses > 0 ? (((validAttendance + proxyAttendance + attendanceNotTaken) / totalClasses) * 100).toFixed(2) : 0}%</p>
-            </div>
-            <div class="mb-3">
-                <small class="d-block mb-1">
-                    <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #ffe6e6;"></span>
-                    Unmarked Attendance
-                </small>
-                <small class="d-block mb-1">
-                    <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #e6f3ff;"></span>
-                    Extra/Online Class
-                </small>
-                <small class="d-block">
-                    <span class="d-inline-block me-3" style="width: 20px; height: 20px; background-color: #ffebcc;"></span>
-                    Cancelled Class
-                </small>
-            </div>
             <div class="table-responsive">
                 <table class="table table-bordered">
                     <colgroup>
@@ -847,6 +901,8 @@
         // Event listener
         document.getElementById('viewAttendance').addEventListener('click', async (e) => {
             document.getElementById('attendanceResults').innerHTML = "";
+            // hide the pie chart
+            document.getElementById('pie_container').classList.add('d-none');
             const entryNumber = document.getElementById('userSelect').value;
             const courseCode = document.getElementById('viewCourse').value;
             if (entryNumber && courseCode) {
