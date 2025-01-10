@@ -146,7 +146,7 @@
                 <!-- Add canvas for pie chart -->
                 <div class="container d-none" id="pie_container">
                     <div class="row justify-content-center">
-                        <div class="col-md-3 mb-2">
+                        <div class="col-md-3 mb-0">
                             <div class="card" style="border-width: 0 !important;">
                                 <div class="card-body" >
                                     <canvas id="attendanceChart"></canvas>
@@ -439,6 +439,40 @@
             }
         });
 
+        async function isClassScheduled(courseCode, date, startTime, endTime) {
+            try {
+                const coursesSnapshot = await database.ref('courses').once('value');
+                const courses = coursesSnapshot.val() || {};
+                const courseSchedule = courses[courseCode]?.schedule || [];
+
+                // Get day of week (0-6) from date
+                const day = new Date(date).getDay();
+
+                // Check if there's a matching schedule
+                const scheduledClass = courseSchedule.find(schedule =>
+                    schedule.day === day &&
+                    schedule.startTime === startTime &&
+                    schedule.endTime === endTime
+                );
+
+                return !!scheduledClass;
+            } catch (error) {
+                console.error('Error checking class schedule:', error);
+                return false;
+            }
+        }
+
+        async function doesClassExist(date, courseCode, timeSlot) {
+            try {
+                const classSnapshot = await database.ref(`classes/${date}/${courseCode}/${timeSlot}`).once('value');
+                return classSnapshot.exists();
+            } catch (error) {
+                console.error('Error checking class existence:', error);
+                return false;
+            }
+        }
+
+        // Replace the existing attendanceForm submit event listener with this updated version
         document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const entryNumber = document.getElementById('userSelect').value;
@@ -454,10 +488,27 @@
                     alert('Please select a user');
                     return;
                 }
+
                 // Check if attendance is allowed
                 const allowed = await isAttendanceAllowed(date, courseCode, timeSlot);
                 if (!allowed) {
                     alert('Cannot mark attendance for this class as it is either cancelled or marked as attendance not taken');
+                    return;
+                }
+                const classExists = await doesClassExist(date, courseCode, timeSlot);
+
+                let shouldProceed = true;
+                if (!classExists) {
+                    const isScheduled = await isClassScheduled(courseCode, date, startTime, endTime);
+                    if (!isScheduled) {
+                        shouldProceed = confirm(
+                            'Warning: This class is not in the regular schedule. ' +
+                            'Are you sure you want to mark attendance for this out-of-schedule class?'
+                        );
+                    }
+                }
+
+                if (!shouldProceed) {
                     return;
                 }
 
@@ -475,17 +526,15 @@
                     timestamp: firebase.database.ServerValue.TIMESTAMP
                 };
 
-                await database.ref(classPath).transaction((currentData) => {
-                    if (currentData === null) {
-                        return {
-                            tag: 'normal',
-                            startTime: startTime,
-                            endTime: endTime,
-                            timestamp: firebase.database.ServerValue.TIMESTAMP
-                        };
-                    }
-                    return currentData;
-                });
+                if (!classExists) {
+                    const isScheduled = await isClassScheduled(courseCode, date, startTime, endTime);
+                    await database.ref(classPath).set({
+                        tag: isScheduled ? 'normal' : 'extra', // Mark unscheduled classes as extra
+                        startTime: startTime,
+                        endTime: endTime,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }
 
                 await database.ref().update(updates);
                 alert('Attendance marked successfully');
