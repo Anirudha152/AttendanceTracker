@@ -781,7 +781,7 @@
                 });
 
                 const totalClasses = classRecords.filter(record =>
-                    record.tag === 'normal' || record.tag === 'online' || record.tag === 'extra' || record.tag === 'attendance_not_taken'
+                    record.tag === 'normal' || record.tag === 'online' || record.tag === 'extra' || record.tag === 'attendance_not_taken' || record.tag === 'other'
                 ).length;
 
                 const validAttendance = attendedClasses.filter(record =>
