@@ -613,10 +613,29 @@
                 const date = document.getElementById('attendanceDate').value;
                 const day = new Date(date).getDay();
                 const coursesSnapshot = await database.ref('courses').once('value');
+                const classSnapshot = await database.ref(`classes/${date}/${courseCode}`).once('value');
                 const courses = coursesSnapshot.val() || {};
+                let class_ = classSnapshot.val() || {};
                 const courseSchedule = courses[courseCode]?.schedule || [];
+                let relevantScheduleByClass;
+
+                if (class_) {
+                    class_ = Object.values(class_)[0];
+                    if (class_) {
+                        relevantScheduleByClass = {
+                            startTime: class_.startTime,
+                            endTime: class_.endTime
+                        }
+                    }
+                } else {
+                    relevantScheduleByClass = {};
+                }
                 const relevantSchedule = courseSchedule.find(schedule => schedule.day === day);
-                if (relevantSchedule) {
+                console.log(relevantSchedule);
+                if (relevantScheduleByClass) {
+                    document.getElementById('startTime').value = relevantScheduleByClass.startTime;
+                    document.getElementById('endTime').value = relevantScheduleByClass.endTime;
+                } else if (relevantSchedule) {
                     document.getElementById('startTime').value = relevantSchedule.startTime;
                     document.getElementById('endTime').value = relevantSchedule.endTime;
                 } else {
@@ -923,7 +942,7 @@
                                     <span class="badge ${
                                         slot.attendance === 'Present' ? 'bg-success' :
                                         slot.attendance === 'Proxy' ? 'bg-warning' :
-                                        slot.classStatus === 'attendance_not_taken' ? 'bg-secondary' :
+                                        slot.classStatus === 'attendance_not_taken' || slot.classStatus === 'cancelled' ? 'bg-secondary' :
                                         'bg-danger'
                                     }">${slot.attendance}</span>
                                 </div>
